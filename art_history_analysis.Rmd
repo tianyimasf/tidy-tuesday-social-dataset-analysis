@@ -1,0 +1,78 @@
+---
+title: "Art History Data Anaysis"
+author: Tianyi Ma
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+In high school I took AP Art History. Although I only got a 3 out of 5 in the exam, which is one of my worst scores, I loved the subject since I get to look at a sea of artworks. TidyTuesday has a ton of fun datasets, but this one stood out to me because they actually extracted data from two Art History textbooks, and I think one of them is actually my high school Art History textbook. I'm compelled to analyze it at this point.
+
+# Read Dataset
+
+```{r}
+library(tidytuesdayR)
+
+tuesdata <- tidytuesdayR::tt_load('2023-01-17')
+tuesdata <- tidytuesdayR::tt_load(2023, week = 03)
+
+arthistory <- tuesdata$arthistory
+```
+It seems like the TidyTuesday version of the dataset only has artist.csv. This is a little disappointing since I originally considered the artwork data to be the meat of this dataset. Luckily the github README file for this dataset cited its original publish site, so I went on there and there it is, the instruction of downloading the full dataset. Let's do it.
+
+```{r}
+# install.packages("arthistory")
+```
+Now let's take a quick look of the inside of the `worksgardner` dataset. 
+```{r}
+library("arthistory")
+```
+
+```{r}
+head(worksgardner, 5)
+```
+Getting basic info on the data:
+
+```{r}
+str(worksgardner)
+```
+
+That is a little disappointing -- I was expecting to see descriptive texts associated with each artwork. But this is okay. The size of the artwork and its texts also could be interesting. 
+
+Right now, though, we observe that the first 5 rows are all work called "Noah's Ark" by Aaron Douglas, just in different editions of the book. Because I don't care about different editions and sizes right now, I'll simply remove every edition other than the latest one for every author and their artwork. Right now, I want to analyze artist and their artwork info. Later, we can try answer questions like "how many artworks are included in each edition" or "How many artworks are added for each edition".
+
+The following snippet group row values by column `artist_name` and `title_of_work`, then only retain the last row. Because the edition row values are in descending order, this should do the trick. Checking the first two rows shows that the code is working. 
+
+```{r}
+library(dplyr)
+worksgardner_lean <- worksgardner %>% 
+  group_by(artist_name, title_of_work) %>%
+  filter(row_number() == n()) %>%
+  ungroup()
+head(worksgardner_lean, 2)
+```
+Further looking into some basic statistic in the new dataframe shows that the number of data points shrunk from 2300+ to ~750 artist-artwork pairs. 
+
+```{r}
+str(worksgardner_lean)
+```
+Now we can answer some question like "who's the most popular artist according to this textbook?". We will show this as a bar graph.
+```{r}
+library('ggplot2')
+library('forcats')
+
+artist_work_num_rank <- worksgardner_lean %>% 
+                          count(artist_name, sort = T)
+
+artist_work_num_rank %>%
+    mutate(artist_name = fct_reorder(artist_name, n)) %>%
+    slice(1:20) %>%
+    ggplot(., aes(x=artist_name, y=n)) + 
+    geom_bar(stat = "identity", fill="#f68060") +
+    coord_flip() +
+    ggtitle('Top 20 Popular Artists') + 
+    xlab('Artist Name') + 
+    ylab('# works included in the Gardner book')
+```
+
+TBD
