@@ -1,22 +1,25 @@
 ---
 title: "Art History Data Anaysis"
-author: Tianyi Ma
-output: html_document
-editor_options: 
+author: "Tianyi Ma"
+date: "05.09.2023"
+output:
+  pdf_document: default
+  word_document: default
+editor_options:
   chunk_output_type: console
 ---
 
-In high school I took AP Art History. Although I only got a 3 out of 5 in the exam, which is one of my worst scores, I loved the subject since I get to look at a sea of artworks. TidyTuesday has a ton of fun datasets, but this one stood out to me because they actually extracted data from two Art History textbooks, and I think one of them is actually my high school Art History textbook. I'm compelled to analyze it at this point.
+In high school I took AP Art History. Although I only got a 3 out of 5 in the exam, which is one of my worst scores, I loved the subject since I get to look at a sea of artworks. Tidy Tuesday has a ton of fun datasets, but this one stood out to me because they actually extracted data from two Art History textbooks, and I think one of them is actually my high school Art History textbook. I'm compelled to analyze it at this point.
 
 # Read Dataset
 
 ```{r}
 library(tidytuesdayR)
 
-tuesdata <- tidytuesdayR::tt_load('2023-01-17')
-tuesdata <- tidytuesdayR::tt_load(2023, week = 03)
+# tuesdata <- tidytuesdayR::tt_load('2023-01-17')
+# tuesdata <- tidytuesdayR::tt_load(2023, week = 03)
 
-arthistory <- tuesdata$arthistory
+# arthistory <- tuesdata$arthistory
 ```
 It seems like the TidyTuesday version of the dataset only has artist.csv. This is a little disappointing since I originally considered the artwork data to be the meat of this dataset. Luckily the github README file for this dataset cited its original publish site, so I went on there and there it is, the instruction of downloading the full dataset. Let's do it.
 
