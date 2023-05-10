@@ -3,8 +3,9 @@ title: "Art History Data Anaysis"
 author: "Tianyi Ma"
 date: "05.09.2023"
 output:
-  pdf_document: default
-  word_document: default
+    odt_document: default
+    word_document: default
+    pdf_document: default
 editor_options:
   chunk_output_type: console
 ---
@@ -59,7 +60,9 @@ Further looking into some basic statistic in the new dataframe shows that the nu
 ```{r}
 str(worksgardner_lean)
 ```
+
 Now we can answer some question like "who's the most popular artist according to this textbook?". We will show this as a bar graph.
+
 ```{r}
 library('ggplot2')
 library('forcats')
@@ -78,4 +81,192 @@ artist_work_num_rank %>%
     ylab('# works included in the Gardner book')
 ```
 
-TBD
+This data package also has a corresponding artist dataset, so I thought it would be interesting to look at info related to artists that are featured in this book. Let's load, take a look, and join the table and do some wrangling.
+
+```{r}
+head(artists, 3)
+```
+
+It turns out the same pattern exists for this dataset -- multiple entries exist for the same artist because of different editions. So here we first apply the same data transformation to only get the last row, and then join the two tables.
+
+```{r}
+artists_lean <- artists %>% 
+  group_by(artist_name) %>%
+  filter(row_number() == n()) %>%
+  ungroup()
+
+by <- join_by(artist_name)
+
+artists_lean <- left_join(artist_work_num_rank, artists_lean) %>% 
+                  rename("num_artworks" = "n")
+head(artists_lean, 3)
+```
+
+Now -- the data has attributes like gender, nationality, race, and ethnicity, so obviously we should plot a pie chart for the distribution of each of those attributes.
+
+```{r}
+gender_dist <- artists_lean %>% 
+                group_by(artist_gender) %>%         
+                summarise(gender_sum=n())
+artists_lean %>% ungroup()
+
+nationality_dist <- artists_lean %>% 
+                group_by(artist_nationality) %>%         
+                summarise(nationality_sum=n())
+artists_lean %>% ungroup()
+
+race_dist <- artists_lean %>% 
+                group_by(artist_race) %>%         
+                summarise(race_sum=n())
+artists_lean %>% ungroup()
+
+ethnicity_dist <- artists_lean %>% 
+                group_by(artist_ethnicity) %>%         
+                summarise(ethnicity_sum=n())
+artists_lean %>% ungroup()
+```
+```{r}
+library("scales")
+gender_dist <- gender_dist %>% 
+                  arrange(desc(gender_sum)) %>%
+                  mutate(prop = gender_sum/sum(gender_sum) *100) %>%
+                  mutate(ypos = cumsum(prop)- 0.5*prop) %>%
+                  ungroup()
+
+gender_dist_graph <- gender_dist %>%
+                      mutate(artist_gender = fct_reorder(artist_gender, prop)) %>%
+                      ggplot(., aes(x="", y=prop, fill=artist_gender)) +
+                        geom_bar(stat="identity", width=1, color="white") +
+                        coord_polar("y", start=0) +
+                        scale_fill_manual(values=c("#CC6666", "#9999CC", "#66CC99")) +
+                        theme_void() +
+                        geom_text(aes(y = ypos, label = percent(prop/100)), color = "white", size=3.5) + 
+                        ggtitle('Gender Distribution of Artists') +
+                        theme(plot.title = element_text(hjust = 0.5))
+
+gender_dist_graph <- gender_dist_graph +
+                        theme(legend.key.size = unit(0.5, 'cm'),
+                              legend.title = element_text(size=10),
+                              legend.text = element_text(size=9),
+                              plot.title=element_text(size=12))
+
+gender_dist_graph
+```
+```{r}
+library("tidyverse")
+library("ggrepel")
+
+nationality_dist <- nationality_dist[nationality_dist$artist_nationality != "N/A",]
+
+nationality_dist <- nationality_dist %>% 
+                      mutate(artist_nationality = fct_lump(artist_nationality, n = 11, w = nationality_sum, other_level = "Others")) %>%
+                      group_by(artist_nationality) %>%
+                      summarize(nationality_sum = sum(nationality_sum)) %>%
+                      arrange(desc(nationality_sum))
+
+nationality_dist <- subset(nationality_dist, artist_nationality != "Others")
+
+nationality_dist <- nationality_dist %>% 
+                      mutate(prop = nationality_sum/sum(nationality_sum) *100) %>%
+                      mutate(ypos = cumsum(prop) - 0.5*prop)
+
+labels <- c(percent(nationality_dist$prop/100)[1:8], c("", "", ""))
+
+nationality_dist_graph <- nationality_dist %>%
+                      mutate(artist_nationality = fct_reorder(artist_nationality, prop)) %>%
+                      ggplot(., aes(x="", y=prop, fill=artist_nationality)) +
+                        geom_bar(stat="identity", width=1, color="white") +
+                        coord_polar("y", start=0) +
+                        scale_fill_brewer(palette = "Set3") +
+                        theme_void() +
+                        geom_text(aes(y = ypos, label = labels), size=3.5, show.legend = F, nudge_x = 0.7) +
+                        ggtitle('Nationality Distribution of Artists') +
+                        theme(plot.title = element_text(hjust = 0.5)) +
+                        guides(fill = guide_legend(reverse=T))
+
+nationality_dist_graph <- nationality_dist_graph +
+                        theme(legend.key.size = unit(0.5, 'cm'),
+                              legend.title = element_text(size=10),
+                              legend.text = element_text(size=9),
+                              plot.title=element_text(size=12))
+nationality_dist_graph
+```
+
+Now for the race data: 
+
+```{r}
+race_dist <- race_dist %>% 
+              arrange(desc(race_sum)) %>%
+              mutate(prop = race_sum/sum(race_sum) *100) %>%
+              mutate(ypos = cumsum(prop) - 0.5*prop)
+
+race_dist_graph <- race_dist %>%
+                    mutate(artist_race = fct_reorder(artist_race, prop)) %>%
+                    ggplot(., aes(x="", y=prop, fill=artist_race)) +
+                      geom_bar(stat="identity", width=1, color="white") +
+                      coord_polar("y", start=0) +
+                      scale_fill_brewer(palette = "Set3") +
+                      theme_void() +
+                      geom_text(aes(y = ypos, label = percent(prop/100)), size=3.5, show.legend = F, nudge_x = 0.8) +
+                      ggtitle('Race Distribution of Artists') +
+                      theme(plot.title = element_text(hjust = 0.5)) +
+                      guides(fill = guide_legend(reverse=T))
+
+race_dist_graph <- race_dist_graph +
+                        theme(legend.key.size = unit(0.5, 'cm'),
+                              legend.title = element_text(size=10),
+                              legend.text = element_text(size=9),
+                              plot.title=element_text(size=12))
+race_dist_graph
+```
+
+Ethnicity distribution:
+
+```{r}
+ethnicity_dist <- ethnicity_dist[ethnicity_dist$artist_ethnicity != "NA",]
+ethnicity_dist <- na.omit(ethnicity_dist)
+
+ethnicity_dist <- ethnicity_dist %>% 
+                    arrange(desc(ethnicity_sum)) %>%
+                    mutate(prop = ethnicity_sum/sum(ethnicity_sum) *100) %>%
+                    mutate(ypos = cumsum(prop) - 0.5*prop)
+
+ethnicity_dist_graph <- ethnicity_dist %>%
+                          mutate(artist_ethnicity = fct_reorder(artist_ethnicity, prop)) %>%
+                            ggplot(., aes(x="", y=prop, fill=artist_ethnicity)) +
+                            geom_bar(stat="identity", width=1, color="white") +
+                            coord_polar("y", start=0) +
+                            scale_fill_manual(values=c("#CC6666", "#9999CC")) +
+                            theme_void() +
+                            geom_text(aes(y = ypos, label = percent(prop/100)), size=4, color = "white") +
+                            ggtitle('Ethnicity Distribution of Artists') +
+                            theme(plot.title = element_text(hjust = 0.5)) +
+                            guides(fill = guide_legend(reverse=T))
+
+ethnicity_dist_graph <- ethnicity_dist_graph +
+                        theme(legend.key.size = unit(0.5, 'cm'),
+                              legend.title = element_text(size=10),
+                              legend.text = element_text(size=9),
+                              plot.title=element_text(size=12))
+
+ethnicity_dist_graph
+```
+
+Putting this together:
+
+```{r}
+library(cowplot)
+
+title <- ggdraw() + draw_label("Complete Analysis of Artist Demographic", fontface='bold')
+top_plot <- plot_grid(gender_dist_graph, nationality_dist_graph, ncol = 2, labels = c("", ""), rel_heights = c(0.5, 2))
+bottom_plot <- plot_grid(race_dist_graph, ethnicity_dist_graph, ncol = 2, labels = c("", ""), rel_widths = c(1, 0.75))
+
+plot_grid(title, top_plot, bottom_plot, nrow = 3, labels = c("", "", ""),
+          rel_heights = c(0.1, 1, 1.2))
+```
+
+
+
+
+
+
