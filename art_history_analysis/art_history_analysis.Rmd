@@ -2,12 +2,14 @@
 title: "Art History Data Anaysis"
 author: "Tianyi Ma"
 date: "05.09.2023"
-output:
-    odt_document: default
-    word_document: default
-    pdf_document: default
-editor_options:
-  chunk_output_type: console
+output: html_document
+    # odt_document: default
+    # word_document: default
+    # pdf_document: default
+# editor_options:
+  # chunk_output_type: console
+editor_options: 
+  chunk_output_type: inline
 ---
 
 In high school I took AP Art History. Although I only got a 3 out of 5 in the exam, which is one of my worst scores, I loved the subject since I get to look at a sea of artworks. Tidy Tuesday has a ton of fun datasets, but this one stood out to me because they actually extracted data from two Art History textbooks, and I think one of them is actually my high school Art History textbook. I'm compelled to analyze it at this point.
@@ -25,11 +27,11 @@ library(tidytuesdayR)
 It seems like the TidyTuesday version of the dataset only has artist.csv. This is a little disappointing since I originally considered the artwork data to be the meat of this dataset. Luckily the github README file for this dataset cited its original publish site, so I went on there and there it is, the instruction of downloading the full dataset. Let's do it.
 
 ```{r}
-# install.packages("arthistory")
+install.packages("arthistory")
 ```
 Now let's take a quick look of the inside of the `worksgardner` dataset. 
 ```{r}
-library("arthistory")
+# library("arthistory")
 ```
 
 ```{r}
@@ -264,9 +266,66 @@ bottom_plot <- plot_grid(race_dist_graph, ethnicity_dist_graph, ncol = 2, labels
 plot_grid(title, top_plot, bottom_plot, nrow = 3, labels = c("", "", ""),
           rel_heights = c(0.1, 1, 1.2))
 ```
+Now I'm interested in the artworks and artists. Let's take a look at the dataframe again
 
+```{r}
+head(worksgardner, 5)
+```
 
+```{r}
+str(worksgardner)
+```
+Let's see some stats:
 
+```{r}
+library(psych)
 
+worksgardner$page_number_of_image <- strtoi(worksgardner$page_number_of_image)
+describe(worksgardner)
+```
+
+I want to explore a few things in this dataset.
+First, I want to create a word cloud of frequent words in the title. Then, I think it's interesting to see how the frequent words changed over time.
+After that, I want to filter "important" artworks. Just browsing the dataframe, I think the area of artwork and area of text can both indicate this, while the area of text should be given more significance since texts are small and a difference in the area could mean that the artwork is much more important than the others. There is no label so I will only speculate by ranking them by an index using the areas and maybe the space ratio, and check if the higher-ranked works are more familiar to me. 
+After getting the above information, we can also peek what's the artist's demography of those highly ranked works. And that will conclude my EDA.
+
+```{r}
+# install.packages("wordcloud")
+library(wordcloud)
+# install.packages("RColorBrewer")
+library(RColorBrewer)
+# install.packages("wordcloud2")
+library(wordcloud2)
+# install.packages("tm")
+library(tm)
+
+words <- unique(worksgardner$title_of_work)
+```
+
+Now we have the tools, let's dig in.
+
+```{r}
+docs <- Corpus(VectorSource(words))
+
+# cleaning texts
+docs <- docs %>%
+  tm_map(removeNumbers) %>%
+  tm_map(removePunctuation)
+
+docs <- tm_map(docs, removeWords, stopwords("english"))
+
+# get word matrix
+dtm <- TermDocumentMatrix(docs) 
+matrix <- as.matrix(dtm) 
+words <- sort(rowSums(matrix), decreasing=TRUE) 
+df <- data.frame(word = names(words), freq=words)
+df <- df[2:nrow(df),]
+```
+
+```{r}
+# create cloud
+set.seed(1234) # for reproducibility 
+wordcloud(words = df$word, freq = df$freq, min.freq = 1,max.words=200, random.order=FALSE, rot.per=0.35,colors=brewer.pal(8, "Dark2"),scale=c(2,1))
+```
 
 
