@@ -135,7 +135,7 @@ def get_Students_Enrolled_Skills_Course_Summary_And_Course_Description(x):
 # # students erolled, skills, "What You'll Learn" section(course summary) and course description
 
 def auto_Scrapper_Class(html_tag,course_case,tag_class):
-  for i in range(43, 44):
+  for i in range(1, 85):
     url = "https://www.coursera.org/courses?page=" +str(i) + "&index=prod_all_products_term_optimization"
     page = requests.get(url)
     soup = BeautifulSoup(page.content, 'html.parser')
