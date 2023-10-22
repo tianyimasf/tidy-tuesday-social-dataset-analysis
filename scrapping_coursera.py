@@ -29,7 +29,8 @@ url = html_soup.find_all(href=True)
 
 
 def get_Title(x):
-  return x.get_text()
+  text = x.find("h3", class_ = "cds-CommonCard-title").get_text()
+  return text
         
 # the function auto_Scrapper is used to get course title
 
@@ -53,12 +54,22 @@ def get_Difficulty_Cert_Type_Time(x):
 # the function get_Difficulty_Cert_Type_Time is to extract course difficulty, certificate type and time span
 
 def get_Rating_And_Reviews_Num(x):
-  elements = x.find_all("p")
+  product_reviews = x.find("div", class_ = "product-reviews")
+  if product_reviews == None:
+    return None, None
+  elements = product_reviews.find_all("p")
   rating = elements[0].get_text()
   reviews_num = elements[1].get_text().split(" ")[0][1:]
   return rating, reviews_num
 
 # the function get_Difficulty_Cert_Type_Time is to extract course rating and number of reviews
+
+def get_Title_Rating_And_Reviews_Num(x):
+  title = get_Title(x)
+  rating, reviews_num = get_Rating_And_Reviews_Num(x)
+  return title, rating, reviews_num
+
+# the function get_Title_Rating_And_Reviews_Num is to extract course title, rating, and number of reviews
 
 def get_Students_Enrolled(soup, html_tag, tag_class):
   element = soup.find_all(html_tag, class_ = tag_class)[1]
@@ -96,7 +107,7 @@ def get_Course_Summary(soup, html_tag, tag_id):
     course_summary.append(summary)
   return course_summary
 
-# the function get_Skills is to extract course summary
+# the function get_Course_Summary is to extract course summary
 
 def get_Course_Description(soup, html_tag, tag_class):
   about_section = soup.find(html_tag, class_ = tag_class)
@@ -107,7 +118,7 @@ def get_Course_Description(soup, html_tag, tag_class):
     course_description += paragraph
   return course_description
 
-# the function get_Skills is to extract course description
+# the function get_Course_Description is to extract course description
 
 def get_Students_Enrolled_Skills_Course_Summary_And_Course_Description(x):
   href = x['href']
@@ -118,21 +129,24 @@ def get_Students_Enrolled_Skills_Course_Summary_And_Course_Description(x):
   skills = get_Skills(soup, "div", "about", course_href)
   course_summary = get_Course_Summary(soup, "div", "about")
   course_description = get_Course_Description(soup, "div", "about-section")
-  return students_enrolled, skills, course_summary, course_description
+  return course_href, students_enrolled, skills, course_summary, course_description
 
 # the function get_Students_Enrolled_Skills_Content_Description_And_Course_Description is to extract 
 # # students erolled, skills, "What You'll Learn" section(course summary) and course description
 
 def auto_Scrapper_Class(html_tag,course_case,tag_class):
-  for i in range(1, 85):
+  for i in range(43, 44):
     url = "https://www.coursera.org/courses?page=" +str(i) + "&index=prod_all_products_term_optimization"
     page = requests.get(url)
     soup = BeautifulSoup(page.content, 'html.parser')
     all_elements = soup.find_all(html_tag, class_ = tag_class)
     for j, x in enumerate(all_elements):
-        if tag_class == "cds-CommonCard-title":
-          title = get_Title(x)
-          course_case.append(title)
+        if tag_class == "cds-ProductCard-content":
+          print(f"Scraping Page {i}: Item {j} -- Title_Rating_And_Reviews_Num")
+          title, rating, reviews_num = get_Title_Rating_And_Reviews_Num(x)
+          course_case[0].append(title)
+          course_case[1].append(rating)
+          course_case[2].append(reviews_num)
         elif tag_class == 'cds-ProductCard-partnerNames':
           print(f"Scraping Page {i}: Item {j} -- Course_Organization")
           org_name = get_Course_Organization(x)
@@ -143,18 +157,14 @@ def auto_Scrapper_Class(html_tag,course_case,tag_class):
           course_case[0].append(course_difficulty)
           course_case[1].append(course_certificate_type)
           course_case[2].append(course_time)
-        elif tag_class == 'product-reviews':
-          print(f"Scraping Page {i}: Item {j} -- Rating_And_Reviews_Num")
-          rating, review_num = get_Rating_And_Reviews_Num(x)
-          course_case[0].append(rating)
-          course_case[1].append(review_num)
         elif tag_class == 'cds-CommonCard-titleLink':
           print(f"Scraping Page {i}: Item {j} -- Students_Enrolled_Skills_Course_Summary_And_Course_Description")
-          students_enrolled, skills, course_summary, course_description = get_Students_Enrolled_Skills_Course_Summary_And_Course_Description(x)
-          course_case[0].append(students_enrolled)
-          course_case[1].append(skills)
-          course_case[2].append(course_summary)
-          course_case[3].append(course_description)
+          course_url, students_enrolled, skills, course_summary, course_description = get_Students_Enrolled_Skills_Course_Summary_And_Course_Description(x)
+          course_case[0].append(course_url)
+          course_case[1].append(students_enrolled)
+          course_case[2].append(skills)
+          course_case[3].append(course_summary)
+          course_case[4].append(course_description)
        
 # the function auto_Scrapper_Class is used to get three parameters that is the tag,what to scrap and get the content scrapped and class it belongs. 
 
@@ -165,6 +175,7 @@ course_rating = []
 course_reviews_num = []
 course_time = []
 course_difficulty = []
+course_url = []
 course_students_enrolled = []
 course_skills = []
 course_summary = []
@@ -173,34 +184,33 @@ course_description = []
 # making an empty list so that we can append each of them at the end into a list for making dataframe.
 
 
-auto_Scrapper_Class('h3', course_title, "cds-CommonCard-title")
+auto_Scrapper_Class('div', [course_title, course_rating, course_reviews_num], "cds-ProductCard-content")
 auto_Scrapper_Class('p',course_organization,'cds-ProductCard-partnerNames')
 auto_Scrapper_Class('div',[course_difficulty, course_certificate_type, course_time],'cds-CommonCard-metadata')
-auto_Scrapper_Class('div',[course_rating, course_reviews_num],'product-reviews')
-auto_Scrapper_Class('a',[course_students_enrolled, course_skills, course_summary, course_description],'cds-CommonCard-titleLink')
+auto_Scrapper_Class('a',[course_url, course_students_enrolled, course_skills, course_summary, course_description],'cds-CommonCard-titleLink')
 # here we are creating the lists of all data required and appending them to list.
 
 import pandas as pd
-courses_df = pd.DataFrame(
-                        {
-                          'course_title': course_title,
-                          'course_organization': course_organization,
-                          'course_certificate_type': course_certificate_type,
-                          'course_time': course_time,
-                          'course_rating':course_rating,
-                          'course_reviews_num':course_reviews_num,
-                           'course_difficulty':course_difficulty,
-                           'course_students_enrolled':course_students_enrolled,
-                           'course_skills':course_skills,
-                           'course_summary':course_summary,
-                           'course_description':course_description
-                          }
-                        )
-courses_df = courses_df.sort_values('course_title')
+
+data_table = {
+             'course_title': course_title,
+              'course_organization': course_organization,
+              'course_certificate_type': course_certificate_type,
+              'course_time': course_time,
+              'course_rating':course_rating,
+              'course_reviews_num':course_reviews_num,
+              'course_difficulty':course_difficulty,
+              'course_url': course_url,
+              'course_students_enrolled':course_students_enrolled,
+              'course_skills':course_skills,
+              'course_summary':course_summary,
+              'course_description':course_description
+               }
+
+df = pd.DataFrame(data_table)
+df = df.sort_values('course_title')
+df.to_csv(f'coursera_courses.csv')
 
 # here we take each lists we generated by scrapping and made a dataframe out of it isung pandas library.
-
-
-courses_df.to_csv('UCoursera_Courses.csv')
 
 # At end we convert it into a csv file so we can use it for our data analysis part.
