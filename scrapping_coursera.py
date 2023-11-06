@@ -10,7 +10,9 @@ Original file is located at
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
 import requests
 from time import sleep
 
@@ -66,8 +68,8 @@ def get_Rating_And_Reviews_Num(x):
 
 def get_Title_Rating_And_Reviews_Num(x):
   title = get_Title(x)
-  rating, reviews_num = get_Rating_And_Reviews_Num(x)
-  return title, rating, reviews_num
+  # rating, reviews_num = get_Rating_And_Reviews_Num(x)
+  return title, "rating", "reviews_num"
 
 # the function get_Title_Rating_And_Reviews_Num is to extract course title, rating, and number of reviews
 
@@ -80,20 +82,39 @@ def get_Students_Enrolled(soup, html_tag, tag_class):
 
 # the function get_Students_Enrolled is to extract # students erolled
 
+import time
+from selenium.webdriver.support import expected_conditions as EC
+
 def get_Skills(soup, html_tag, tag_id, course_href):
-  about = soup.find(html_tag, id = tag_id)
   options = Options()
-  options.add_argument("--window-size=1920x1080")
+  options.add_argument("--window-size=4000x4000")
   options.add_argument("--headless")
   driver = webdriver.Chrome(options=options)
-  driver.get(course_href)
-  soup = BeautifulSoup(driver.page_source, 'html.parser')
-  about = soup.find("div", id = "about")
-  elements = soup.find_all("span", "css-18p0rob")
+  js_code1 = 'return document.getElementById("about").getElementsByClassName("css-mzc3kb");'
+  js_code2 = 'return document.getElementById("about").getElementsByClassName("css-is1tpd")[0].getElementsByTagName("h2")[0].innerHTML;'
+  condition1 = lambda driver: driver.execute_script(js_code1) != []
+  condition2 = lambda driver: driver.execute_script(js_code2) == "Skills you'll gain"
+  try:
+    driver.get(course_href)
+    WebDriverWait(driver, 5).until(EC.all_of(condition1, condition2))
+  except:
+    print(f"{course_href}: timed out")
+    return []
+  element = driver.find_element(By.CLASS_NAME, "css-yk0mzy")
+  li = element.find_elements(By.TAG_NAME, "li")
+  if li[-1].get_attribute("text") == "View all skills":
+    button = li[-1].click()
+    time.sleep(10)
+  js_code = 'return document.getElementById("about");'
+  html_code = driver.execute_script(js_code).get_attribute("innerHTML")
+  driver.close()
+  driver.quit()
+  about = BeautifulSoup(html_code, 'html.parser')
+  elements = about.find("div", class_ = "css-is1tpd").find_all("a", class_ = "css-mzc3kb")
   skills = []
-  for j in range(0, len(elements)):
-      x = elements[j].text
-      skills.append(x)
+  for x in elements:
+    skills.append(x.get_text())
+  print(course_href, skills)
   return skills
 
 # the function get_Skills is to extract course skills
@@ -125,46 +146,57 @@ def get_Students_Enrolled_Skills_Course_Summary_And_Course_Description(x):
   course_href = "https://www.coursera.org" + href
   page = requests.get(course_href)
   soup = BeautifulSoup(page.content, 'html.parser')
-  students_enrolled = get_Students_Enrolled(soup, "div", "css-kd6yq1")
+  # students_enrolled = get_Students_Enrolled(soup, "div", "css-kd6yq1")
+  students_enrolled = ""
   skills = get_Skills(soup, "div", "about", course_href)
-  course_summary = get_Course_Summary(soup, "div", "about")
-  course_description = get_Course_Description(soup, "div", "about-section")
+  # course_summary = get_Course_Summary(soup, "div", "about")
+  course_summary = ""
+  # course_description = get_Course_Description(soup, "div", "about-section")
+  course_description = ""
   return course_href, students_enrolled, skills, course_summary, course_description
 
 # the function get_Students_Enrolled_Skills_Content_Description_And_Course_Description is to extract 
 # # students erolled, skills, "What You'll Learn" section(course summary) and course description
 
+import math
+import numpy as np
+
 def auto_Scrapper_Class(html_tag,course_case,tag_class):
-  for i in range(1, 85):
+  for i in range(20, 84):
     url = "https://www.coursera.org/courses?page=" +str(i) + "&index=prod_all_products_term_optimization"
     page = requests.get(url)
     soup = BeautifulSoup(page.content, 'html.parser')
     all_elements = soup.find_all(html_tag, class_ = tag_class)
-    for j, x in enumerate(all_elements):
-        if tag_class == "cds-ProductCard-content":
-          print(f"Scraping Page {i}: Item {j} -- Title_Rating_And_Reviews_Num")
-          title, rating, reviews_num = get_Title_Rating_And_Reviews_Num(x)
-          course_case[0].append(title)
-          course_case[1].append(rating)
-          course_case[2].append(reviews_num)
-        elif tag_class == 'cds-ProductCard-partnerNames':
-          print(f"Scraping Page {i}: Item {j} -- Course_Organization")
-          org_name = get_Course_Organization(x)
-          course_case.append(org_name)
-        elif tag_class == 'cds-CommonCard-metadata':
-          print(f"Scraping Page {i}: Item {j} -- Difficulty_Cert_Type_Time")
-          course_difficulty, course_certificate_type, course_time = get_Difficulty_Cert_Type_Time(x)
-          course_case[0].append(course_difficulty)
-          course_case[1].append(course_certificate_type)
-          course_case[2].append(course_time)
-        elif tag_class == 'cds-CommonCard-titleLink':
-          print(f"Scraping Page {i}: Item {j} -- Students_Enrolled_Skills_Course_Summary_And_Course_Description")
-          course_url, students_enrolled, skills, course_summary, course_description = get_Students_Enrolled_Skills_Course_Summary_And_Course_Description(x)
-          course_case[0].append(course_url)
-          course_case[1].append(students_enrolled)
-          course_case[2].append(skills)
-          course_case[3].append(course_summary)
-          course_case[4].append(course_description)
+    length = len(all_elements)
+    rows_num, has_tail, indices_lists, tail_list = generateIndiceList(length)
+    for j in range(length):
+      scrape_data(i, j, all_elements[j], tag_class, course_case)
+
+def scrape_data(i, j, x, tag_class, course_case):
+  if tag_class == "cds-ProductCard-content":
+    print(f"Scraping Page {i}: Item {j} -- Title_Rating_And_Reviews_Num")
+    title, rating, reviews_num = get_Title_Rating_And_Reviews_Num(x)
+    course_case[0].append(title)
+    course_case[1].append(rating)
+    course_case[2].append(reviews_num)
+  elif tag_class == 'cds-ProductCard-partnerNames':
+    print(f"Scraping Page {i}: Item {j} -- Course_Organization")
+    org_name = get_Course_Organization(x)
+    course_case.append(org_name)
+  elif tag_class == 'cds-CommonCard-metadata':
+    print(f"Scraping Page {i}: Item {j} -- Difficulty_Cert_Type_Time")
+    course_difficulty, course_certificate_type, course_time = get_Difficulty_Cert_Type_Time(x)
+    course_case[0].append(course_difficulty)
+    course_case[1].append(course_certificate_type)
+    course_case[2].append(course_time)
+  elif tag_class == 'cds-CommonCard-titleLink':
+    print(f"Scraping Page {i}: Item {j} -- Students_Enrolled_Skills_Course_Summary_And_Course_Description")
+    course_url, students_enrolled, skills, course_summary, course_description = get_Students_Enrolled_Skills_Course_Summary_And_Course_Description(x)
+    course_case[0].append(course_url)
+    course_case[1].append(students_enrolled)
+    course_case[2].append(skills)
+    course_case[3].append(course_summary)
+    course_case[4].append(course_description)
        
 # the function auto_Scrapper_Class is used to get three parameters that is the tag,what to scrap and get the content scrapped and class it belongs. 
 
@@ -183,7 +215,7 @@ course_description = []
 
 # making an empty list so that we can append each of them at the end into a list for making dataframe.
 
-
+ 
 auto_Scrapper_Class('div', [course_title, course_rating, course_reviews_num], "cds-ProductCard-content")
 auto_Scrapper_Class('p',course_organization,'cds-ProductCard-partnerNames')
 auto_Scrapper_Class('div',[course_difficulty, course_certificate_type, course_time],'cds-CommonCard-metadata')
